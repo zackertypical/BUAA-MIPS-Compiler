@@ -269,7 +269,9 @@ void Assert::parse_main() {
                 getSym();
                 parse_complex();
                 if (symType == rbrace) {
-                    getSym();
+                    if (middleCode.back() != "ret ") {
+                        newMiddleCode("ret ");
+                    }
                     DEBUG_OUT("主函数")
                 }
             }
@@ -298,6 +300,9 @@ void Assert::parse_nfunc_def() {
         parse_complex();
         if (symType == rbrace) {
             getSym();
+            if (middleCode.back() != "ret ") {
+                newMiddleCode("ret ");
+            }
             DEBUG_OUT("无返回值函数定义")
             symbolSet.erase(symbolSet.begin() + symPlace, symbolSet.end());
         }
