@@ -774,15 +774,16 @@ void Assert::parse_scanf() {
     if (symType == lparent) {
         getSym();
         newMiddleCode("push " + symName);
+        newMiddleCode("call scanf");
         parse_iden();
         while (symType == comma) {
             getSym();
             newMiddleCode("push " + symName);
+            newMiddleCode("call scanf");
             parse_iden();
         }
         if (symType == rparent) {
             getSym();
-            newMiddleCode("call scanf");
         } else {
             error.addError(symLineNo, 'l');
             getSym();

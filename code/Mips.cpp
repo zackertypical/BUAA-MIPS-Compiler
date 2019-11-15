@@ -12,6 +12,7 @@ Mips::Mips(vector<string> &middleCode) : middleCode(middleCode) {
     currentAddr = 0;
     paras = 0;
     funcStack = 0;
+    pushes = 0;
 }
 
 void Mips::parse() {
@@ -356,6 +357,7 @@ void Mips::parseSent() {
                 if (addr >= 0) {
                     outToMips("lw $t8, " + to_string(-addr) + "($sp)");
                     outToMips("push $t8");
+                    pushes++;
                 }
             } else {
                 int i;

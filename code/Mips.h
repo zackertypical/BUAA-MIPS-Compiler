@@ -33,6 +33,7 @@ private:
     int currentAddr;
     int paras;
     int funcStack;
+    int pushes;
     string currentCode;
     instr currentInstr;
     string condType;
