@@ -5,7 +5,7 @@
 #ifndef COMPILER_SYMBOLMAP_H
 #define COMPILER_SYMBOLMAP_H
 
-#include "basics.h"
+#include "babasics.h"
 
 enum SymbolType {vint, vchar, aint, achar, pint, pchar, fint, fchar, fvoid, errors};
 

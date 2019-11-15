@@ -1,0 +1,16 @@
+int a, b, i;
+
+int fibo(int n) {
+    printf(n);
+    printf("\n");
+    if (n <= 2) {
+        return (1);
+    }
+    return (fibo(n-1) + fibo(n-2));
+}
+
+void main() {
+    int n;
+    scanf(n);
+    printf("Test Fibo: ", fibo(n));
+}

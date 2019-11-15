@@ -1,5 +1,5 @@
-#include "frontend/Parser.h"
-#include "backend/Mips.h"
+#include "Parser.h"
+#include "Mips.h"
 
 vector<string> middleCode;
 

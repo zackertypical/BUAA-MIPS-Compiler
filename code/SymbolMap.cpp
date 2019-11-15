@@ -63,6 +63,7 @@ SymbolType SymbolMap::findType(string name){
     } else if (prevpt != nullptr){
         return prevpt->findType(name);
     }
+    cout << name << endl;
     return errors;
 }
 
@@ -72,6 +73,6 @@ string SymbolMap::getOutput(string name, int paras) {
     if (type == pint || type == pchar) {
         return to_string(addr - paras * 4 - 4) + "($fp)";
     } else {
-        return to_string(addr) + "($sp)";
+        return to_string(-addr) + "($sp)";
     }
 }

@@ -757,7 +757,7 @@ void Assert::parse_for() {
                             parse_sent();
                             DEBUG_OUT("for循环语句")
                             newMiddleCode(tsym + " = " + tsym + " " + top + " " + tlength);
-                            newMiddleCode("BZ label_" + to_string(labele));
+                            newMiddleCode("GOTO label_" + to_string(labele));
                             newMiddleCode("label_" + to_string(label) + ":");
                         } else {
                             error.addError(symLineNo, 'l');
@@ -805,6 +805,7 @@ void Assert::parse_printf() {
         }
         if (symType == rparent) {
             getSym();
+            newMiddleCode("call printf");
             DEBUG_OUT("printf语句")
         } else if (symType == comma) {
             getSym();
