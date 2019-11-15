@@ -269,7 +269,9 @@ void Assert::parse_main() {
                 getSym();
                 parse_complex();
                 if (symType == rbrace) {
-                    getSym();
+                    if (middleCode.back() != "ret ") {
+                        newMiddleCode("ret ");
+                    }
                     DEBUG_OUT("主函数")
                 }
             }
@@ -298,6 +300,9 @@ void Assert::parse_nfunc_def() {
         parse_complex();
         if (symType == rbrace) {
             getSym();
+            if (middleCode.back() != "ret ") {
+                newMiddleCode("ret ");
+            }
             DEBUG_OUT("无返回值函数定义")
             symbolSet.erase(symbolSet.begin() + symPlace, symbolSet.end());
         }
@@ -752,7 +757,7 @@ void Assert::parse_for() {
                             parse_sent();
                             DEBUG_OUT("for循环语句")
                             newMiddleCode(tsym + " = " + tsym + " " + top + " " + tlength);
-                            newMiddleCode("BZ label_" + to_string(labele));
+                            newMiddleCode("GOTO label_" + to_string(labele));
                             newMiddleCode("label_" + to_string(label) + ":");
                         } else {
                             error.addError(symLineNo, 'l');
@@ -800,6 +805,7 @@ void Assert::parse_printf() {
         }
         if (symType == rparent) {
             getSym();
+            newMiddleCode("call printf");
             DEBUG_OUT("printf语句")
         } else if (symType == comma) {
             getSym();

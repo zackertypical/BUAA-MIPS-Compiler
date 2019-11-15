@@ -1,0 +1,34 @@
+const char c = 'c';
+int n;
+char m;
+int foo(int s, int p){
+    printf("Let's foo! p = ", p);
+    printf("\n");
+    return (s);
+}
+void fee(int s) {
+    printf("Let's fee! s = ", s);
+    printf("\n");
+}
+
+char faa() {
+    const char z = 'z';
+    return (z);
+}
+
+void main() {
+    int i, j;
+    scanf(n);
+    m = 'v';
+    printf("Test char print\n");
+    printf(c);
+    printf("Test char print\n");
+    printf(m);
+    for (i = 0; i < n; i = i + 1) {
+        printf(i);
+        printf("\n");s
+        j = foo(i,n)
+        fee(j);
+    }
+    printf("End!\n", faa());
+}
