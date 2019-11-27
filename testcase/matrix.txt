@@ -1,0 +1,33 @@
+const int MAX_SIZE = 8;
+int matrixA[64], matrixB[64];
+void main() {
+    int i,j, n,m;
+    int matrixC[64];
+    scanf(n)
+    for (i=0; i<n; i=i+1){
+        for(j=0;j<n;j=j+1){
+            scanf(m);
+            matrixA[i*n+j]=m;
+        }
+    }
+    for (i=0; i<n; i=i+1){
+        for(j=0;j<n;j=j+1){
+            scanf(m);
+            matrixB[i*n+j]=m;
+        }
+    }
+    for (i=0; i<n; i=i+1){
+        for(j=0;j<n;j=j+1){
+            matrixC[i*n+j] = 0;
+            for (m=0;m<n;m=m+1){
+                matrixC[i*n+j] = matrixC[i*n+j] + matrixA[i*n+m] * matrixB[m*n+j];
+            }
+        }
+    }
+
+    for (i=0; i<n; i=i+1){
+        for(j=0;j<n;j=j+1){
+            printf(matrixC[i*n+j]);
+        }
+    }
+}

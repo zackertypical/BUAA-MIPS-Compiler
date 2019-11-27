@@ -25,14 +25,15 @@ void Assert::appendMiddleCode(string string1) {
 string Assert::parsePolandExpr(string str) {
     int funcs = 0;
     int mode = 0;
-    for(int i = 0; i < str.length(); i++) {
-        if(!mode && str[i] == '(') {
+    for (int i = 0; i < str.length(); i++) {
+        if (!mode && str[i] == '(') {
             mode++;
             int j = i + 1;
             for (; j < str.length(); j++) {
                 if (str[j] == '(') {
                     mode++;
-                } if (str[j] == ')') {
+                }
+                if (str[j] == ')') {
                     mode--;
                     if (!mode) {
                         break;
@@ -71,13 +72,12 @@ string Assert::parsePolandExpr(string str) {
             exprList.erase(exprList.begin() + i);
             i -= 1;
         } else if (exprList.at(i) == "-s") {
-            newMiddleCode("__tmp" + to_string(tmps) + " = - " + exprList.at(i - 1));
+            newMiddleCode("__tmp" + to_string(tmps) + " = 0 - " + exprList.at(i - 1));
             exprList.erase(exprList.begin() + i - 1);
             i -= 1;
             exprList.at(i) = "__tmp" + to_string(tmps++);
         } else if (exprList.at(i) == "[]") {
-            newMiddleCode("__tmp" + to_string(tmps) + " = " + exprList.at(i - 2) + "[" +
-                          exprList.at(i - 1) + "]");
+            newMiddleCode("__tmp" + to_string(tmps) + " = " + exprList.at(i - 2) + "[0] [] " + exprList.at(i - 1));
             exprList.erase(exprList.begin() + i - 2);
             exprList.erase(exprList.begin() + i - 2);
             i -= 2;
@@ -85,25 +85,28 @@ string Assert::parsePolandExpr(string str) {
         } else if (exprList.at(i) == "=") {
             newMiddleCode(exprList.at(i - 2) + " = " + exprList.at(i - 1));
         } else if (exprList.at(i) == "[]=") {
-            newMiddleCode(exprList.at(i - 3) + "[" + exprList.at(i - 2) + "] = " + exprList.at(i - 1));
+            newMiddleCode(exprList.at(i - 3) + "[0] = " + exprList.at(i - 2) + " []= " + exprList.at(i - 1));
         }
     }
     return "__tmp" + to_string(tmps - 1);
 }
 
 void Assert::parsePolandFunc(string str, string funcName, string rets) {
+    cout << str << endl;
     int paras = 0;
     int mode = 0;
     int i = 0;
-    for(i = 0; i < str.length(); i++) {
+    for (i = 0; i < str.length(); i++) {
         if (str[i] == '(') {
             mode++;
-        } if (str[i] == ')') {
+        }
+        if (str[i] == ')') {
             mode--;
         }
         if (!mode && str[i] == ',') {
             string strtmp = str.substr(0, i);
             str.replace(0, i + 2, "");
+            i = 0;
             parsePolandExpr("__para" + to_string(paras) + " " + strtmp + "= ");
             newMiddleCode("push __para" + to_string(paras++));
         }
@@ -112,6 +115,7 @@ void Assert::parsePolandFunc(string str, string funcName, string rets) {
         parsePolandExpr("__para" + to_string(paras) + " " + str + "= ");
         newMiddleCode("push __para" + to_string(paras++));
     }
+    newMiddleCode("push __retaddr");
     newMiddleCode("call " + funcName);
     newMiddleCode(rets + " = RET");
 }
@@ -436,6 +440,7 @@ void Assert::parse_para_list(string funcName) {
             functionMap[funcName].push_back(typp);
         }
     }
+    newMiddleCode("para int __retaddr");
     DEBUG_OUT("参数表")
 }
 
@@ -519,7 +524,7 @@ void Assert::parse_const_char() {
     if (symType != charcon) {
         error.addError(symLineNo, 'o');
     } else {
-        appendMiddleCode(to_string((int)symName[0]));
+        appendMiddleCode(to_string((int) symName[0]));
     }
     getSym();
 }
@@ -724,10 +729,13 @@ void Assert::parse_for() {
     getSym();
     if (symType == lparent) {
         getSym();
+        string idenName = symName;
         parse_iden();
         if (symType == assign) {
             getSym();
             parse_expr();
+            exprps.back() = idenName + " " + exprps.back() + "= ";
+            parsePolandExpr(exprps.back());
             if (symType != semicn) {
                 error.addError(symLineNo, 'k');
             }
@@ -773,13 +781,11 @@ void Assert::parse_scanf() {
     getSym();
     if (symType == lparent) {
         getSym();
-        newMiddleCode("push " + symName);
-        newMiddleCode("call scanf");
+        newMiddleCode("mac scanf " + symName);
         parse_iden();
         while (symType == comma) {
             getSym();
-            newMiddleCode("push " + symName);
-            newMiddleCode("call scanf");
+            newMiddleCode("mac scanf " + symName);
             parse_iden();
         }
         if (symType == rparent) {
@@ -798,32 +804,32 @@ void Assert::parse_printf() {
         if (symType == strcon) {
             newMiddleCode("push \"" + symName + "\"");
             parse_str();
+            newMiddleCode("mac printf_string");
         } else {
             parse_expr();
             exprps.back() = "__print " + exprps.back() + "= ";
             parsePolandExpr(exprps.back());
-            newMiddleCode("push __print");
+            newMiddleCode("mac printf_expr");
         }
         if (symType == rparent) {
             getSym();
-            newMiddleCode("call printf");
             DEBUG_OUT("printf语句")
         } else if (symType == comma) {
             getSym();
             parse_expr();
             exprps.back() = "__print " + exprps.back() + "= ";
             parsePolandExpr(exprps.back());
-            newMiddleCode("push __print");
             if (symType == rparent) {
                 getSym();
             } else {
                 error.addError(symLineNo, 'l');
             }
-            newMiddleCode("call printf");
+            newMiddleCode("mac printf_expr");
             DEBUG_OUT("printf语句")
         } else {
             error.addError(symLineNo, 'l');
         }
+        newMiddleCode("mac printf_line");
     }
 
 }
@@ -1076,7 +1082,7 @@ int Assert::parse_factor() {
             getSym();
         }
     } else if (symType == charcon) {
-        exprp += to_string((int)symName[0]) + " ";
+        exprp += to_string((int) symName[0]) + " ";
         getSym();
         DEBUG_OUT("因子")
         return 1;

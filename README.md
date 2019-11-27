@@ -7,9 +7,13 @@ Author: Sharinka
 
 ## 简介
 
-编译运行该c++程序，将待编译代码放在同目录testfile.txt中。
+编译运行该C++程序，将待编译代码放在同目录testfile.txt中。
 
 中间代码输出在同目录middle_code.txt
+
+符号表输出在同目录symbolset.txt
+
+MIPS程序输出在同目录mips.txt
 
 ## 进度
 
@@ -17,6 +21,6 @@ Author: Sharinka
 
 2019/11/15 完成作业“代码生成1”的要求
 
-
+2019/11/28 完成作业“代码生成2”的要求，debug中
 
 ~~认真编程，努力不鸽，争取传一个像样的Repo~~
