@@ -1,0 +1,14 @@
+int a[10000];
+
+int f(int x) {
+	if (a[x] == 0) a[x] = f(x - 1) + f(x - 2);
+	return (a[x]);
+}
+
+void main() {
+	int x;
+	a[1] = 1; 
+	a[2] = 1;
+	scanf(x);
+	printf(f(x));
+}

@@ -1,0 +1,56 @@
+int n, u, v, Min;
+int cnt, head[100];
+int edge_to[100], edge_next[100];
+int siz[100], dp[100];
+
+void init() {
+	int i;
+	cnt = 0;
+	Min = 10000000;
+	for (i = 0; i < 100; i = i + 1) head[i] = -1;
+}
+
+void addEdge(int u, int v) {
+	edge_to[cnt] = v; edge_next[cnt] = head[u];
+	head[u] = cnt;
+	cnt = cnt + 1;
+	edge_to[cnt] = u; edge_next[cnt] = head[v];
+	head[v] = cnt;
+	cnt = cnt + 1;
+}
+
+void dfs(int u, int p) {
+	int i, v, j;
+	siz[u] = 1;
+	for (i = head[u]; i != -1; j = j + 1) {
+		v = edge_to[i];
+		if (v != p) {
+			dfs(v, u);
+			siz[u] = siz[u] + siz[v];
+			if (dp[u] < siz[v]) {
+				dp[u] = siz[v];
+			}
+		}
+		i = edge_next[i];
+	}
+	if (n - siz[u] > dp[u]) dp[u] = n - siz[u];
+	if (dp[u] < Min) Min = dp[u];
+}
+
+void main() {
+	int i;
+	scanf(n);
+	init();
+	for (i = 0; i  < n - 1; i = i + 1) {
+		scanf(u, v);
+		addEdge(u, v);
+	}
+	dfs(1, -1);
+	printf(Min);
+	for (i = 1; i <= n; i = i + 1) {
+		if (dp[i] == Min) {
+			printf(i);
+		}
+	}
+	return;
+}

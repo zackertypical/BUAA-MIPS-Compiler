@@ -103,6 +103,8 @@ public:
 
     int parse_term();
 
+    int parse_term(string sign);
+
     int parse_factor();
 
     void parse();

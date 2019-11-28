@@ -139,6 +139,9 @@ void Lexer::parseString() {
                 return;
             }
         }
+        if (c == '\\') {
+            strbuf[cc++] = '\\';
+        }
         strbuf[cc++] = c;
         getChar();
     }

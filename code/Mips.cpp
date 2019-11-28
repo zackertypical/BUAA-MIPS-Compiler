@@ -10,51 +10,121 @@ Mips::Mips(vector<string> &middleCode) : middleCode(middleCode) {
     codePlace = 0;
     currentCode = "";
     currentAddr = 0;
+    currentStack = 0;
     paras = 0;
     funcStack = 0;
     pushes = 0;
 }
 
 void Mips::parse() {
-    outMips.open("mips.txt", ios::trunc | ios::out);
-    outToMips(".macro push %x");
-    outToMips("sw %x, 0($fp)");
-    outToMips("addiu $fp, $fp, 4");
-    outToMips(".end_macro");
-    outToMips("");
-    outToMips(".macro pop %x");
-    outToMips("addiu $fp, $fp, -4");
-    outToMips("lw %x, 0($fp)");
-    outToMips(".end_macro");
-    outToMips("");
-    outToMips(".text");
-    outToMips("la $fp, splabel");
-    outToMips("la $t7, slabelb");
-
     while (codePlace < middleCode.size()) {
         getSent();
         instrs.push_back(currentInstr);
-        parseSent();
     }
-    outToMips("");
-    outToMips(".data");
-    outToMips("splabel:");
-    outToMips(".space 1024");
-    outToMips("slabelb:");
-    outToMips(".asciiz \"\"");
-    outToMips("slabeln:");
-    outToMips(".asciiz \"\\n\"");
-    for (int i = 0; i < constStrings.size(); i++) {
-        string elm = constStrings.at(i);
-        outToMips("slabel_" + to_string(i) + ":");
-        outToMips(".asciiz " + elm);
+    // 定义一些常用的宏
+    setMacro();
+
+    // 分析vector instrs中的中间代码
+    // 寻找可以内联的函数，并构建函数符号表
+    parseFunc();
+    // 分析所有常量变量定义，构建符号表
+    parseDef();
+    outSymbolMap();
+    // 开始翻译语句
+    parseSent();
+    // 处理data段
+    setData();
+
+    outMips.open("mips.txt", ios::trunc | ios::out);
+
+    for (string elm : dotMacro) {
+        outMips << elm << endl;
+    }
+    outMips << ".data" << endl;
+    for (string elm : dotData) {
+        outMips << elm << endl;
+    }
+
+    outMips << ".text" << endl;
+    for (string elm : dotText) {
+        outMips << elm << endl;
     }
 
     outMips.close();
 }
 
-void Mips::outToMips(string str) {
-    outMips << str << endl;
+void Mips::outToText(string str) {
+    dotText.push_back(str);
+}
+
+void Mips::outToMacro(string str) {
+    dotMacro.push_back(str);
+}
+
+void Mips::outToData(string str) {
+    dotData.push_back(str);
+}
+
+void Mips::setMacro() {
+    outToMacro(".macro push %x");
+    outToMacro("sw %x, 0($fp)");
+    outToMacro("addiu $fp, $fp, 4");
+    outToMacro(".end_macro");
+    outToMacro("");
+    outToMacro(".macro pop %x");
+    outToMacro("addiu $fp, $fp, -4");
+    outToMacro("lw %x, 0($fp)");
+    outToMacro(".end_macro");
+    outToMacro("");
+    outToMacro(".macro scanf_int");
+    outToMacro("li $v0, 5");
+    outToMacro("syscall");
+    outToMacro(".end_macro");
+    outToMacro("");
+    outToMacro(".macro scanf_char");
+    outToMacro("li $v0, 12");
+    outToMacro("syscall");
+    outToMacro(".end_macro");
+    outToMacro("");
+    outToMacro(".macro printf_line");
+    outToMacro("la $a0, slabeln");
+    outToMacro("li $v0, 4");
+    outToMacro("syscall");
+    outToMacro(".end_macro");
+    outToMacro(".macro printf_string");
+    outToMacro("move $a0, $a3");
+    outToMacro("li $v0, 4");
+    outToMacro("syscall");
+    outToMacro("la $a3, slabelb");
+    outToMacro(".end_macro");
+    outToMacro("");
+    outToMacro(".macro printf_int");
+    outToMacro("li $v0, 1");
+    outToMacro("syscall");
+    outToMacro(".end_macro");
+    outToMacro("");
+    outToMacro(".macro printf_char");
+    outToMacro("li $v0, 11");
+    outToMacro("syscall");
+    outToMacro(".end_macro");
+    outToMacro("");
+}
+
+void Mips::setData() {
+    outToData("fplabel:");
+    outToData(".space 10240");
+    outToData("gplabel:");
+    outToData(".space 40960");
+    outToData("slabelb:");
+    outToData(".asciiz \"\"");
+    outToData("slabeln:");
+    outToData(".asciiz \"\\n\"");
+    for (int i = 0; i < constStrings.size(); i++) {
+        string elm = constStrings.at(i);
+        outToData("__str" + to_string(i) + ":");
+        outToData(".asciiz \"" + elm + "\"");
+    }
+    outToData("");
 }
 
 void Mips::getSent() {
@@ -73,9 +143,6 @@ void Mips::getSent() {
     string tmpstr = currentCode.substr(0, i);
     if (tmpstr == "ret") {
         currentInstr.type = ret;
-        if (i == currentCode.size()) {
-            return;
-        }
     } else if (tmpstr == "const") {
         currentInstr.type = constdef;
     } else if (tmpstr == "var") {
@@ -95,13 +162,16 @@ void Mips::getSent() {
     } else if (tmpstr == "BZ") {
         currentInstr.type = bz;
     } else if (tmpstr.back() == ':') {
-        currentInstr.iden0 = tmpstr;
         currentInstr.type = label;
-        return;
+    } else if (tmpstr == "mac") {
+        currentInstr.type = mac;
     } else {
         currentInstr.type = cal;
     }
     currentInstr.iden0 = tmpstr;
+    if (i == currentCode.size()) {
+        return;
+    }
     while (true) {
         base = i + 1;
         int inquote = 0;
@@ -117,6 +187,9 @@ void Mips::getSent() {
         switch (c) {
             case 0:
                 currentInstr.iden1 = tmpstr;
+                if (currentInstr.type == funcdef) {
+                    currentInstr.iden1 = tmpstr.substr(0, tmpstr.size() - 2);
+                }
                 break;
             case 1:
                 currentInstr.iden2 = tmpstr;
@@ -137,355 +210,581 @@ void Mips::getSent() {
     }
 }
 
-void Mips::createPreVar() {
-    currentMap->add("__cond1", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__cond2", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__para0", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__para1", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__para2", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__para3", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__para4", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__para5", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__para6", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__para7", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__para8", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__tmp0", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__tmp1", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__tmp2", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__tmp3", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__tmp4", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__tmp5", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__tmp6", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__tmp7", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__tmp8", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__func0", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__func1", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__func2", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__func3", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__func4", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__retval", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__print", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("__", vint, 1, currentAddr);
-    currentAddr += 4;
-    currentMap->add("RET", vint, 1, currentAddr);
-    currentAddr += 4;
+void Mips::parseFunc() {
+    string currentFunc;
+    SymbolType currentFuncType = errors;
+    int canInline = 1;
+    int currentFuncParas = 0;
+    for (codePlace = 0; codePlace < middleCode.size(); codePlace++) {
+        currentInstr = instrs.at(codePlace);
+        if (currentInstr.type == funcdef) {
+            if (!currentFunc.empty()) {
+                currentMap->addFunc(currentFunc, currentFuncType, currentFuncParas, canInline);
+            }
+
+            currentFunc = currentInstr.iden1;
+            if (currentInstr.iden0 == "int") {
+                currentFuncType = fint;
+            } else if (currentInstr.iden0 == "char") {
+                currentFuncType = fchar;
+            } else {
+                currentFuncType = fvoid;
+            }
+            currentFuncParas = 0;
+            canInline = 1;
+        } else if (currentInstr.type == paradef) {
+            currentFuncParas++;
+        } else if (currentInstr.type == ret) {
+            if (instrs.size() <= codePlace + 1 || instrs.at(codePlace + 1).type != funcdef) {
+                canInline = 0;
+            }
+        } else if (currentInstr.type == fcall) {
+            canInline = 0;
+        }
+    }
+
+    currentMap->addFunc(currentFunc, currentFuncType, currentFuncParas, 0);
+}
+
+void Mips::parseDef() {
+    int currentFuncParas = 0;
+    for (codePlace = 0; codePlace < middleCode.size(); codePlace++) {
+        currentInstr = instrs.at(codePlace);
+        if (currentInstr.type == funcdef) {
+            if (currentMap->getPrev() != nullptr) {
+                currentMap = currentMap->getPrev();
+            }
+            currentFuncParas = currentMap->searchFunc(currentInstr.iden1)->place;
+            currentMap = currentMap->getNext(currentInstr.iden1);
+            currentStack = 0;
+        } else if (currentInstr.type == paradef) {
+            if (currentInstr.iden1 == "int") {
+                currentMap->add(currentInstr.iden2 + "_Fake", pint, 3, -currentFuncParas * 4);
+                currentMap->add(currentInstr.iden2, vint, 1, currentStack * 4);
+                currentStack++;
+            } else {
+                currentMap->add(currentInstr.iden2 + "_Fake", pchar, 3, -currentFuncParas * 4);
+                currentMap->add(currentInstr.iden2, vchar, 1, currentStack * 4);
+                currentStack++;
+            }
+            currentFuncParas--;
+        } else if (currentInstr.type == constdef || currentInstr.type == vardef) {
+            if (currentMap->getPrev() == nullptr) {
+                if (currentInstr.iden1 == "int") {
+                    if (currentInstr.iden2.back() == ']') {
+                        int i;
+                        for (i = 0; i < currentInstr.iden2.size(); i++) {
+                            if (currentInstr.iden2.at(i) == '[') {
+                                break;
+                            }
+                        }
+                        int n = stoi(currentInstr.iden2.substr(i + 1, currentInstr.iden2.size() - i - 1));
+                        for (int j = 0; j < n; j++) {
+                            currentMap->add(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", aint, 0,
+                                            currentAddr * 4);
+                            currentAddr++;
+                        }
+                    } else {
+                        currentMap->add(currentInstr.iden2, vint, 0, currentAddr * 4);
+                        currentAddr++;
+                    }
+                } else {
+                    if (currentInstr.iden2.back() == ']') {
+                        int i;
+                        for (i = 0; i < currentInstr.iden2.size(); i++) {
+                            if (currentInstr.iden2.at(i) == '[') {
+                                break;
+                            }
+                        }
+                        int n = stoi(currentInstr.iden2.substr(i + 1, currentInstr.iden2.size() - i - 1));
+                        for (int j = 0; j < n; j++) {
+                            currentMap->add(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", achar, 0,
+                                            currentAddr * 4);
+                            currentAddr++;
+                        }
+                    } else {
+                        currentMap->add(currentInstr.iden2, vchar, 0, currentAddr * 4);
+                        currentAddr++;
+                    }
+                }
+            } else {
+                if (currentInstr.iden1 == "int") {
+                    if (currentInstr.iden2.back() == ']') {
+                        int i;
+                        for (i = 0; i < currentInstr.iden2.size(); i++) {
+                            if (currentInstr.iden2.at(i) == '[') {
+                                break;
+                            }
+                        }
+                        int n = stoi(currentInstr.iden2.substr(i + 1, currentInstr.iden2.size() - i - 1));
+                        for (int j = 0; j < n; j++) {
+                            currentMap->add(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", aint, 1,
+                                            currentStack * 4);
+                            currentStack++;
+                        }
+                    } else {
+                        currentMap->add(currentInstr.iden2, vint, 1, currentStack * 4);
+                        currentStack++;
+                    }
+                } else {
+                    if (currentInstr.iden2.back() == ']') {
+                        int i;
+                        for (i = 0; i < currentInstr.iden2.size(); i++) {
+                            if (currentInstr.iden2.at(i) == '[') {
+                                break;
+                            }
+                        }
+                        int n = stoi(currentInstr.iden2.substr(i + 1, currentInstr.iden2.size() - i - 1));
+                        for (int j = 0; j < n; j++) {
+                            currentMap->add(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", achar, 1,
+                                            currentStack * 4);
+                            currentStack++;
+                        }
+                    } else {
+                        currentMap->add(currentInstr.iden2, vchar, 1, currentStack * 4);
+                        currentStack++;
+                    }
+                }
+            }
+        } else if (currentInstr.type == cal) {
+            if (currentInstr.iden0.back() != ']') {
+                if (!currentInstr.iden4.empty()) {
+                    if (currentMap->add(currentInstr.iden0, vint, 1, currentStack * 4)) {
+                        currentStack++;
+                    }
+                } else {
+                    SymbolType typee = currentMap->getType(currentInstr.iden2);
+                    if (currentMap->add(currentInstr.iden0, typee, 1, currentStack * 4)) {
+                        currentStack++;
+                    }
+                }
+            }
+        } else if (currentInstr.type == push) {
+            if (currentInstr.iden1.at(0) == '\"') {
+                constStrings.push_back(currentInstr.iden1.substr(1, currentInstr.iden1.size() - 2));
+                currentMap->add("__str" + to_string(constStrings.size() - 1), str, 0, constStrings.size() - 1);
+                instrs.at(codePlace).iden1 = "__str" + to_string(constStrings.size() - 1);
+            }
+        } else if (currentInstr.type == fcall) {
+            if (currentInstr.iden0 == "char") {
+                currentMap->add("RET", vchar, 1, currentStack * 4);
+            } else {
+                currentMap->add("RET", vint, 1, currentStack * 4);
+            }
+            currentStack++;
+        }
+    }
+}
+
+void Mips::outSymbolMap() {
+    ofstream outSym;
+    outSym.open("symbolset.txt", ios::trunc | ios::out);
+    if (currentMap->getPrev() != nullptr) {
+        currentMap = currentMap->getPrev();
+    }
+    outSym << "Symbol Table: global" << endl;
+    outSym << "--------------------------------------------" << endl;
+    outSym << "|   symbol name   | type | place | address |" << endl;
+    outSym << "--------------------------------------------" << endl;
+    currentMap->printSymbols(outSym);
+    outSym << "--------------------------------------------" << endl;
+    outSym << endl;
+
+    map<string, SymbolMap *> theMap = currentMap->getNextList();
+    map<string, SymbolMap *>::iterator iter;
+
+    for (iter = theMap.begin(); iter != theMap.end(); iter++) {
+        outSym << "Symbol Table: " + iter->first << endl;
+        outSym << "--------------------------------------------" << endl;
+        outSym << "|   symbol name   | type | place | address |" << endl;
+        outSym << "--------------------------------------------" << endl;
+        iter->second->printSymbols(outSym);
+        outSym << "--------------------------------------------" << endl;
+        outSym << endl;
+    }
+
+    outSym.close();
 }
 
 void Mips::parseSent() {
-    switch (currentInstr.type) {
-        case constdef:
-            if (currentInstr.iden1 == "int") {
-                currentMap->add(currentInstr.iden2, vint, 1, currentAddr);
-            } else {
-                currentMap->add(currentInstr.iden2, vchar, 1, currentAddr);
-            }
-            outToMips("li $t8, " + currentInstr.iden4);
-            outToMips("sw $t8, " + to_string(-currentAddr) + "($sp)");
-            currentAddr += 4;
-            break;
-        case vardef:
-            if (currentInstr.iden1 == "int") {
-                int i, l = 0, r = 0;
-                for (i = 0; i < currentInstr.iden2.size(); i++) {
-                    if (currentInstr.iden2[i] == '[') {
-                        l = i + 1;
-                    }
-                    if (currentInstr.iden2[i] == ']') {
-                        r = i;
-                    }
-                }
-                if (l == 0) {
-                    currentMap->add(currentInstr.iden2, vint, 1, currentAddr);
-                    currentAddr += 4;
+    string lastFunc;
+    outToText("la $fp, fplabel");
+    outToText("la $gp, gplabel");
+    for (codePlace = 0; codePlace < middleCode.size(); codePlace++) {
+        currentInstr = instrs.at(codePlace);
+        switch (currentInstr.type) {
+            case constdef:
+                if (currentMap->getPrev() != nullptr && currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                    outToMacro(currentMap->saveSymbol(currentInstr.iden4, currentInstr.iden2));
                 } else {
-                    string sub = currentInstr.iden2.substr(l, r - l);
-                    r = stoi(sub);
-                    for (i = 0; i < r; i++) {
-                        currentMap->add(currentInstr.iden2.substr(0, l) + to_string(i) + "]", vint, 1, currentAddr);
-                        currentAddr += 4;
-                    }
+                    outToText(currentMap->saveSymbol(currentInstr.iden4, currentInstr.iden2));
                 }
-            } else {
-                int i, l = 0, r = 0;
-                for (i = 0; i < currentInstr.iden2.size(); i++) {
-                    if (currentInstr.iden2[i] == '[') {
-                        l = i + 1;
-                    }
-                    if (currentInstr.iden2[i] == ']') {
-                        r = i;
-                    }
-                }
-                if (l == 0) {
-                    currentMap->add(currentInstr.iden2, vchar, 1, currentAddr);
-                    currentAddr += 4;
-                } else {
-                    string sub = currentInstr.iden2.substr(l, r - l);
-                    r = stoi(sub);
-                    for (i = 0; i < r; i++) {
-                        currentMap->add(currentInstr.iden2.substr(0, l) + to_string(i) + "]", vchar, 1, currentAddr);
-                        currentAddr += 4;
-                    }
-                }
-            }
-            outToMips("sw $0, " + to_string(-currentAddr) + "($sp)");
-            break;
-        case funcdef:
-            paras = 0;
-            if (currentMap->getPrev() != nullptr) {
-                currentMap = currentMap->getPrev();
-            } else {
-                outToMips("jal flabel_main");
-                outToMips("");
-                outToMips("flabel_scanf:");
-                outToMips("li $v0, 5");
-                outToMips("syscall");
-                outToMips("sw $v0, 0($t8)");
-                outToMips("jr $ra");
-                outToMips("");
-                outToMips("flabel_scanfc:");
-                outToMips("li $v0, 12");
-                outToMips("syscall");
-                outToMips("sw $v0, 0($t8)");
-                outToMips("jr $ra");
-                outToMips("");
-                outToMips("flabel_printf:");
-                outToMips("li $v0, 4");
-                outToMips("move $a0, $t7");
-                outToMips("syscall");
-                outToMips("la $t7, slabelb");
-                outToMips("pop $t8");
-                outToMips("li $v0, 1");
-                outToMips("move $a0, $t8");
-                outToMips("syscall");
-                outToMips("li $v0, 4");
-                outToMips("la $a0, slabeln");
-                outToMips("syscall");
-                outToMips("jr $ra");
-                outToMips("");
-                outToMips("flabel_printfc:");
-                outToMips("li $v0, 4");
-                outToMips("move $a0, $t7");
-                outToMips("syscall");
-                outToMips("la $t7, slabelb");
-                outToMips("pop $t8");
-                outToMips("li $v0, 11");
-                outToMips("move $a0, $t8");
-                outToMips("syscall");
-                outToMips("li $v0, 4");
-                outToMips("la $a0, slabeln");
-                outToMips("syscall");
-                outToMips("jr $ra");
-                outToMips("");
-                outToMips("flabel_printfs:");
-                outToMips("li $v0, 4");
-                outToMips("move $a0, $t7");
-                outToMips("syscall");
-                outToMips("la $t7, slabelb");
-                outToMips("li $v0, 4");
-                outToMips("la $a0, slabeln");
-                outToMips("syscall");
-                outToMips("jr $ra");
-                outToMips("");
-
-            }
-            if (currentInstr.iden0 == "int") {
-                currentMap->add(currentInstr.iden1.substr(0, currentInstr.iden1.size() - 2), fint, 1, currentAddr);
-            } else if (currentInstr.iden0 == "char") {
-                currentMap->add(currentInstr.iden1.substr(0, currentInstr.iden1.size() - 2), fchar, 1, currentAddr);
-            } else {
-                currentMap->add(currentInstr.iden1.substr(0, currentInstr.iden1.size() - 2), fvoid, 1, currentAddr);
-            }
-            outToMips("flabel_" + currentInstr.iden1.substr(0, currentInstr.iden1.size() - 2) + ":");
-
-            symbolMaps.emplace_back(currentMap);
-            currentMap = new SymbolMap(currentMap);
-            currentAddr += 4;
-            createPreVar();
-
-            outToMips("push $ra");
-            currentMap->add("__retaddr", pint, 1, funcStack);
-            break;
-        case paradef:
-            if (currentInstr.iden1 == "int") {
-                currentMap->add(currentInstr.iden2, pint, 1, paras * 4);
-            } else {
-                currentMap->add(currentInstr.iden2, pchar, 1, paras * 4);
-            }
-            paras++;
-            break;
-        case ret:
-            if (!currentInstr.iden1.empty()) {
-                int addr = currentMap->search(currentInstr.iden1);
-                if (addr >= 0) {
-                    outToMips("lw $t9, " + to_string(-addr) + "($sp)");
-                }
-            }
-            outToMips("pop $ra");
-            outToMips("addiu $fp, $fp, " + to_string(paras * 4));
-            outToMips("jr $ra");
-            break;
-        case push:
-            if (currentInstr.iden1[0] != '\"') {
-                int addr = currentMap->search(currentInstr.iden1);
-                if (addr >= 0) {
-                    outToMips("lw $t8, " + to_string(-addr) + "($sp)");
-                    outToMips("push $t8");
-                    pushes++;
-                }
-            } else {
-                int i;
-                for (i = 0; i < constStrings.size(); i++) {
-                    if (constStrings.at(i) == currentInstr.iden1) {
-                        break;
-                    }
-                }
-
-                if (i == constStrings.size()) {
-                    constStrings.push_back(currentInstr.iden1);
-                }
-                outToMips("la $t7, slabel_" + to_string(i));
-            }
-            break;
-        case fcall:
-            if (!currentInstr.iden1.empty()) {
-                if (currentInstr.iden1 == "scanf") {
-                    outToMips("pop $t8");
-                    outToMips("la $t8, " + currentMap->getOutput(instrs.at(instrs.size() - 2).iden1, paras));
-                    SymbolType type = currentMap->findType(instrs.at(instrs.size() - 2).iden1);
-                    if (type == vchar || type == pchar) {
-                        currentInstr.iden1 = "scanfc";
-                    }
-                } else if (currentInstr.iden1 == "printf") {
-                    string tstr = instrs.at(instrs.size() - 2).iden1;
-                    if (tstr[0] == '\"') {
-                        currentInstr.iden1 = "printfs";
+                break;
+            case paradef:
+                if (currentInstr.iden2 != "__retaddr") {
+                    if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                        outToMacro(currentMap->loadSymbol("$t8", currentInstr.iden2 + "_Fake"));
+                        outToMacro(currentMap->saveSymbol("$t8", currentInstr.iden2));
                     } else {
-                        SymbolType type = currentMap->findType(instrs.at(instrs.size() - 2).iden1);
-                        if (type == vchar || type == pchar) {
-                            currentInstr.iden1 = "printfc";
-                        }
+                        outToText(currentMap->loadSymbol("$t8", currentInstr.iden2 + "_Fake"));
+                        outToText(currentMap->saveSymbol("$t8", currentInstr.iden2));
                     }
                 }
-                outToMips("jal flabel_" + currentInstr.iden1);
-            }
-            break;
-        case cal:
-            if (currentInstr.iden0 == "__cond1" && currentInstr.iden2 == "__cond2") {
-                condType = currentInstr.iden1;
-            } else {
-                int type = 0;
-                if (currentInstr.iden2 == "RET") {
-                    outToMips("sw $t9, " + currentMap->getOutput(currentInstr.iden0, paras));
-                    if (currentMap->findType(instrs.at(instrs.size() - 2).iden1) == fchar) {
-                        type = 1;
+                break;
+            case funcdef:
+                // 处理上一个函数的结尾
+                if (currentMap->getPrev() != nullptr) {
+                    currentMap = currentMap->getPrev();
+                    if (currentMap->searchFunc(lastFunc)->addr) {
+                        if (currentMap->getNext(lastFunc)->search("__retval") != nullptr) {
+                            outToMacro(currentMap->getNext(lastFunc)->loadSymbol("$v1", "__retval"));
+                        }
+                        outToMacro("addiu $fp, $fp, " + to_string(currentMap->searchFunc(lastFunc)->place * -4));
+                        outToMacro("addiu $sp, $sp, 1024");
+                        outToMacro(".end_macro");
+                        outToMacro("");
+                    } else {
+                        if (currentMap->getNext(lastFunc)->search("__retval") != nullptr) {
+                            outToText(currentMap->getNext(lastFunc)->loadSymbol("$v1", "__retval"));
+                        }
+                        outToText("lw $ra, " + currentMap->getNext(lastFunc)->getOutput("__retaddr"));
+                        outToText("addiu $fp, $fp, " + to_string(currentMap->searchFunc(lastFunc)->place * -4));
+                        outToText("addiu $sp, $sp, 1024");
+                        outToText("jr $ra");
+                        outToText("");
                     }
                 } else {
-                    if (isdigit(currentInstr.iden2[0]) || currentInstr.iden2[0] == '-') {
-                        outToMips("li $t1, " + currentInstr.iden2);
-                    } else if (currentMap->search(currentInstr.iden2) >= 0) {
-                        outToMips("lw $t1, " + currentMap->getOutput(currentInstr.iden2, paras));
-                        if (currentMap->findType(currentInstr.iden2) == pchar ||
-                            currentMap->findType(currentInstr.iden2) == vchar ||
-                            currentMap->findType(currentInstr.iden2) == fchar) {
-                            type = 1;
-                        }
+                    outToText("jal flabel_main");
+                }
+                // 处理这个函数的开头
+                lastFunc = currentInstr.iden1;
+                if (currentMap->searchFunc(currentInstr.iden1)->addr) {
+                    outToMacro(".macro flabel_" + currentInstr.iden1);
+                    outToMacro("addiu $sp, $sp, -1024");
+                } else {
+                    outToText("flabel_" + currentInstr.iden1 + ":");
+                    outToText("addiu $sp, $sp, -1024");
+                    if (currentInstr.iden1 != "main") {
+                        outToText(currentMap->getNext(currentInstr.iden1)->saveSymbol("$ra", "__retaddr"));
                     }
-                    if (currentInstr.iden3.empty()) {
-                        outToMips("sw $t1, " + currentMap->getOutput(currentInstr.iden0, paras));
-                    } else {
-                        type = 0;
-                        if (isdigit(currentInstr.iden4[0]) || currentInstr.iden4[0] == '-') {
-                            outToMips("li $t2, " + currentInstr.iden4);
+                }
+                currentMap = currentMap->getNext(currentInstr.iden1);
+                break;
+            case ret:
+                // 只处理不在函数最后的return
+                if (instrs.size() > codePlace + 1 && instrs.at(codePlace + 1).type != funcdef) {
+                    if (!currentInstr.iden1.empty()) {
+                        outToText(currentMap->loadSymbol("$v1", "__retval"));
+                    }
+                    outToText("lw $ra, " + currentMap->getOutput("__retaddr"));
+                    outToText("addiu $fp, $fp, " + to_string(currentMap->getPrev()->searchFunc(lastFunc)->place * -4));
+                    outToText("addiu $sp, $sp, 1024");
+                    outToText("jr $ra");
+                }
+                break;
+            case push:
+                if (currentInstr.iden1 != "__retaddr") {
+                    if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                        if (currentInstr.iden1.substr(0, 5) == "__str") {
+                            outToMacro("la $a3, " + currentInstr.iden1);
                         } else {
-                            outToMips("lw $t2, " + currentMap->getOutput(currentInstr.iden4, paras));
+                            outToMacro(currentMap->loadSymbol("$t8", currentInstr.iden1));
+                            outToMacro("push $t8");
                         }
-                        if (currentInstr.iden3 == "+") {
-                            outToMips("add $t0, $t1, $t2");
-                        } else if (currentInstr.iden3 == "-") {
-                            outToMips("sub $t0, $t1, $t2");
-                        } else if (currentInstr.iden3 == "*") {
-                            outToMips("mul $t0, $t1, $t2");
-                        } else if (currentInstr.iden3 == "/") {
-                            outToMips("div $t0, $t1, $t2");
+                    } else {
+                        if (currentInstr.iden1.substr(0, 5) == "__str") {
+                            outToText("la $a3, " + currentInstr.iden1);
+                        } else {
+                            outToText(currentMap->loadSymbol("$t8", currentInstr.iden1));
+                            outToText("push $t8");
                         }
-                        outToMips("sw $t0, " + currentMap->getOutput(currentInstr.iden0, paras));
+                    }
+                } else {
+                    if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                        outToMacro("push $0");
+                    } else {
+                        outToText("push $0");
                     }
                 }
-                if (currentInstr.iden0[0] == '_' && currentInstr.iden0[1] == '_') {
-                    currentMap->setType(currentInstr.iden0, type ? vchar : vint);
+                break;
+            case fcall:
+                if (currentMap->getPrev()->searchFunc(currentInstr.iden1)->addr) {
+                    outToText("flabel_" + currentInstr.iden1);
+                    outToText(currentMap->saveSymbol("$v1", "RET"));
+                } else {
+                    outToText("jal flabel_" + currentInstr.iden1);
+                    outToText(currentMap->saveSymbol("$v1", "RET"));
                 }
-            }
-            break;
-        case label:
-            outToMips(currentInstr.iden0);
-            break;
-        case bgoto:
-            outToMips("j " + currentInstr.iden1);
-            break;
-        case bnz:
-            outToMips("lw $t1, " + to_string(-currentMap->search("__cond1")) + "($sp)");
-            outToMips("lw $t2, " + to_string(-currentMap->search("__cond2")) + "($sp)");
-            outToMips("sub $t0, $t1, $t2");
-            if (condType == "==") {
-                outToMips("beqz $t0, " + currentInstr.iden1);
-            } else if (condType == "!=") {
-                outToMips("bnez $t0, " + currentInstr.iden1);
-            } else if (condType == ">=") {
-                outToMips("bgez $t0, " + currentInstr.iden1);
-            } else if (condType == "<=") {
-                outToMips("blez $t0, " + currentInstr.iden1);
-            } else if (condType == ">") {
-                outToMips("bgtz $t0, " + currentInstr.iden1);
-            } else if (condType == "<") {
-                outToMips("bltz $t0, " + currentInstr.iden1);
-            }
-            break;
-        case bz:
-            outToMips("lw $t1, " + to_string(-currentMap->search("__cond1")) + "($sp)");
-            outToMips("lw $t2, " + to_string(-currentMap->search("__cond2")) + "($sp)");
-            outToMips("sub $t0, $t1, $t2");
-            if (condType == "==") {
-                outToMips("bnez $t0, " + currentInstr.iden1);
-            } else if (condType == "!=") {
-                outToMips("beqz $t0, " + currentInstr.iden1);
-            } else if (condType == ">=") {
-                outToMips("bltz $t0, " + currentInstr.iden1);
-            } else if (condType == "<=") {
-                outToMips("bgtz $t0, " + currentInstr.iden1);
-            } else if (condType == ">") {
-                outToMips("blez $t0, " + currentInstr.iden1);
-            } else if (condType == "<") {
-                outToMips("bgez $t0, " + currentInstr.iden1);
-            }
-            break;
-        default:
-            break;
+                if (currentMap->getPrev()->searchFunc(currentInstr.iden1)->type == fchar) {
+                    currentMap->setType("RET", vchar);
+                } else {
+                    currentMap->setType("RET", vint);
+                }
+                break;
+            case cal:
+                if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                    if (currentInstr.iden1 == "=") {
+                        if (!currentInstr.iden3.empty()) {
+                            if (currentMap->search(currentInstr.iden2) != nullptr) {
+                                outToMacro(currentMap->loadSymbol("$t8", currentInstr.iden2));
+                            } else {
+                                outToMacro("li $t8, " + currentInstr.iden2);
+                            }
+                            if (currentMap->search(currentInstr.iden4) != nullptr) {
+                                outToMacro(currentMap->loadSymbol("$t9", currentInstr.iden4));
+                            } else {
+                                outToMacro("li $t9, " + currentInstr.iden4);
+                            }
+                            if (currentInstr.iden3 == "+") {
+                                outToMacro("add $t8, $t8, $t9");
+                                outToMacro(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            } else if (currentInstr.iden3 == "-") {
+                                outToMacro("sub $t8, $t8, $t9");
+                                outToMacro(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            } else if (currentInstr.iden3 == "*") {
+                                outToMacro("mul $t8, $t8, $t9");
+                                outToMacro(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            } else if (currentInstr.iden3 == "/") {
+                                outToMacro("div $t8, $t9");
+                                outToMacro("mflo $t8");
+                                outToMacro(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            } else if (currentInstr.iden3 == "[]=") {
+                                outToMacro("sll $t8, $t8, 2");
+                                outToMacro(
+                                        "addiu $t8, $t8, " + to_string(currentMap->search(currentInstr.iden0)->addr));
+                                if (currentMap->search(currentInstr.iden0)->place == 0) {
+                                    outToMacro("add $t8, $t8, $gp");
+                                } else {
+                                    outToMacro("add $t8, $t8, $sp");
+                                }
+                                outToMacro("sw $t9, 0($t8)");
+                            } else if (currentInstr.iden3 == "[]") {
+                                outToMacro("sll $t9, $t9, 2");
+                                outToMacro(
+                                        "addiu $t9, $t9, " + to_string(currentMap->search(currentInstr.iden2)->addr));
+                                if (currentMap->search(currentInstr.iden2)->place == 0) {
+                                    outToMacro("add $t9, $t9, $gp");
+                                } else {
+                                    outToMacro("add $t9, $t9, $sp");
+                                }
+                                outToMacro("lw $t8, 0($t9)");
+                                outToMacro(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            }
+                        } else {
+                            if (currentMap->search(currentInstr.iden2) != nullptr) {
+                                outToMacro(currentMap->loadSymbol("$t8", currentInstr.iden2));
+                            } else {
+                                outToMacro("li $t8, " + currentInstr.iden2);
+                            }
+                            outToMacro(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                        }
+                    } else {
+                        condType = currentInstr.iden1;
+                    }
+                } else {
+                    if (currentInstr.iden1 == "=") {
+                        if (!currentInstr.iden3.empty()) {
+                            if (currentMap->search(currentInstr.iden2) != nullptr) {
+                                outToText(currentMap->loadSymbol("$t8", currentInstr.iden2));
+                            } else {
+                                outToText("li $t8, " + currentInstr.iden2);
+                            }
+                            if (currentMap->search(currentInstr.iden4) != nullptr) {
+                                outToText(currentMap->loadSymbol("$t9", currentInstr.iden4));
+                            } else {
+                                outToText("li $t9, " + currentInstr.iden4);
+                            }
+                            if (currentInstr.iden3 == "+") {
+                                outToText("add $t8, $t8, $t9");
+                                outToText(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            } else if (currentInstr.iden3 == "-") {
+                                outToText("sub $t8, $t8, $t9");
+                                outToText(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            } else if (currentInstr.iden3 == "*") {
+                                outToText("mul $t8, $t8, $t9");
+                                outToText(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            } else if (currentInstr.iden3 == "/") {
+                                outToText("div $t8, $t9");
+                                outToText("mflo $t8");
+                                outToText(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            } else if (currentInstr.iden3 == "[]=") {
+                                outToText("sll $t8, $t8, 2");
+                                outToText("addiu $t8, $t8, " + to_string(currentMap->search(currentInstr.iden0)->addr));
+                                if (currentMap->search(currentInstr.iden0)->place == 0) {
+                                    outToText("add $t8, $t8, $gp");
+                                } else {
+                                    outToText("add $t8, $t8, $sp");
+                                }
+                                outToText("sw $t9, 0($t8)");
+                            } else if (currentInstr.iden3 == "[]") {
+                                outToText("sll $t9, $t9, 2");
+                                outToText("addiu $t9, $t9, " + to_string(currentMap->search(currentInstr.iden2)->addr));
+                                if (currentMap->search(currentInstr.iden2)->place == 0) {
+                                    outToText("add $t9, $t9, $gp");
+                                } else {
+                                    outToText("add $t9, $t9, $sp");
+                                }
+                                outToText("lw $t8, 0($t9)");
+                                outToText(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                            }
+                        } else {
+                            if (currentMap->search(currentInstr.iden2) != nullptr) {
+                                outToText(currentMap->loadSymbol("$t8", currentInstr.iden2));
+                            } else {
+                                outToText("li $t8, " + currentInstr.iden2);
+                            }
+                            outToText(currentMap->saveSymbol("$t8", currentInstr.iden0));
+                        }
+                    } else {
+                        condType = currentInstr.iden1;
+                    }
+                }
+                if (currentInstr.iden0 == "__print") {
+                    currentMap->setType("__print", currentMap->getType(currentInstr.iden2));
+                }
+                if (currentInstr.iden0.substr(0, 6) == "__func") {
+                    currentMap->setType(currentInstr.iden0, currentMap->getType(currentInstr.iden2));
+                }
+                break;
+            case label:
+                if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                    outToMacro(currentInstr.iden0);
+                } else {
+                    outToText(currentInstr.iden0);
+                }
+                break;
+            case bgoto:
+                if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                    outToMacro("j " + currentInstr.iden1);
+                } else {
+                    outToText("j " + currentInstr.iden1);
+                }
+                break;
+            case bnz:
+                if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                    outToMacro(currentMap->loadSymbol("$t8", "__cond1"));
+                    outToMacro(currentMap->loadSymbol("$t9", "__cond2"));
+                    outToMacro("sub $t8, $t8, $t9");
+                    if (condType == "==") {
+                        outToMacro("beqz $t8, " + currentInstr.iden1);
+                    } else if (condType == "!=") {
+                        outToMacro("bnez $t8, " + currentInstr.iden1);
+                    } else if (condType == ">=") {
+                        outToMacro("bgez $t8, " + currentInstr.iden1);
+                    } else if (condType == "<=") {
+                        outToMacro("blez $t8, " + currentInstr.iden1);
+                    } else if (condType == ">") {
+                        outToMacro("bgtz $t8, " + currentInstr.iden1);
+                    } else if (condType == "<") {
+                        outToMacro("bltz $t8, " + currentInstr.iden1);
+                    }
+                } else {
+                    outToText(currentMap->loadSymbol("$t8", "__cond1"));
+                    outToText(currentMap->loadSymbol("$t9", "__cond2"));
+                    outToText("sub $t8, $t8, $t9");
+                    if (condType == "==") {
+                        outToText("beqz $t8, " + currentInstr.iden1);
+                    } else if (condType == "!=") {
+                        outToText("bnez $t8, " + currentInstr.iden1);
+                    } else if (condType == ">=") {
+                        outToText("bgez $t8, " + currentInstr.iden1);
+                    } else if (condType == "<=") {
+                        outToText("blez $t8, " + currentInstr.iden1);
+                    } else if (condType == ">") {
+                        outToText("bgtz $t8, " + currentInstr.iden1);
+                    } else if (condType == "<") {
+                        outToText("bltz $t8, " + currentInstr.iden1);
+                    }
+                }
+                break;
+            case bz:
+                if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                    outToMacro(currentMap->loadSymbol("$t8", "__cond1"));
+                    outToMacro(currentMap->loadSymbol("$t9", "__cond2"));
+                    outToMacro("sub $t8, $t8, $t9");
+                    if (condType == "==") {
+                        outToMacro("bnez $t8, " + currentInstr.iden1);
+                    } else if (condType == "!=") {
+                        outToMacro("beqz $t8, " + currentInstr.iden1);
+                    } else if (condType == ">=") {
+                        outToMacro("bltz $t8, " + currentInstr.iden1);
+                    } else if (condType == "<=") {
+                        outToMacro("bgtz $t8, " + currentInstr.iden1);
+                    } else if (condType == ">") {
+                        outToMacro("blez $t8, " + currentInstr.iden1);
+                    } else if (condType == "<") {
+                        outToMacro("bgez $t8, " + currentInstr.iden1);
+                    }
+                } else {
+                    outToText(currentMap->loadSymbol("$t8", "__cond1"));
+                    outToText(currentMap->loadSymbol("$t9", "__cond2"));
+                    outToText("sub $t8, $t8, $t9");
+                    if (condType == "==") {
+                        outToText("bnez $t8, " + currentInstr.iden1);
+                    } else if (condType == "!=") {
+                        outToText("beqz $t8, " + currentInstr.iden1);
+                    } else if (condType == ">=") {
+                        outToText("bltz $t8, " + currentInstr.iden1);
+                    } else if (condType == "<=") {
+                        outToText("bgtz $t8, " + currentInstr.iden1);
+                    } else if (condType == ">") {
+                        outToText("blez $t8, " + currentInstr.iden1);
+                    } else if (condType == "<") {
+                        outToText("bgez $t8, " + currentInstr.iden1);
+                    }
+                }
+                break;
+            case mac:
+                if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
+                    if (currentInstr.iden1 == "scanf") {
+                        SymbolType type = currentMap->search(currentInstr.iden2)->type;
+                        if (type == vchar || type == achar || type == pchar) {
+                            outToMacro("scanf_char");
+                            outToMacro(currentMap->saveSymbol("$v0", currentInstr.iden2));
+                        } else {
+                            outToMacro("scanf_int");
+                            outToMacro(currentMap->saveSymbol("$v0", currentInstr.iden2));
+                        }
+                    } else if (currentInstr.iden1 == "printf_string") {
+                        outToMacro("printf_string");
+                    } else if (currentInstr.iden1 == "printf_expr") {
+                        outToMacro(currentMap->loadSymbol("$a0", "__print"));
+                        SymbolType type = currentMap->search("__print")->type;
+                        if (type == vchar || type == achar || type == pchar) {
+                            outToMacro("printf_char");
+                        } else {
+                            outToMacro("printf_int");
+                        }
+                    } else if (currentInstr.iden1 == "printf_line") {
+                        outToMacro("printf_line");
+                    }
+                } else {
+                    if (currentInstr.iden1 == "scanf") {
+                        SymbolType type = currentMap->search(currentInstr.iden2)->type;
+                        if (type == vchar || type == achar || type == pchar) {
+                            outToText("scanf_char");
+                            outToText(currentMap->saveSymbol("$v0", currentInstr.iden2));
+                        } else {
+                            outToText("scanf_int");
+                            outToText(currentMap->saveSymbol("$v0", currentInstr.iden2));
+                        }
+                    } else if (currentInstr.iden1 == "printf_string") {
+                        outToText("printf_string");
+                    } else if (currentInstr.iden1 == "printf_expr") {
+                        SymbolType type = currentMap->search("__print")->type;
+                        outToText(currentMap->loadSymbol("$a0", "__print"));
+                        if (type == vchar || type == achar || type == pchar) {
+                            outToText("printf_char");
+                        } else {
+                            outToText("printf_int");
+                        }
+                    } else if (currentInstr.iden1 == "printf_line") {
+                        outToText("printf_line");
+                    }
+                }
+                break;
+            default:
+                break;
+        }
     }
 }

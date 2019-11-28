@@ -3,12 +3,10 @@ int n;
 char m;
 int foo(int s, int p){
     printf("Let's foo! p = ", p);
-    printf("\n");
     return (s);
 }
 void fee(int s) {
     printf("Let's fee! s = ", s);
-    printf("\n");
 }
 
 char faa() {
@@ -26,9 +24,8 @@ void main() {
     printf(m);
     for (i = 0; i < n; i = i + 1) {
         printf(i);
-        printf("\n");s
         j = foo(i,n)
         fee(j);
     }
-    printf("End!\n", faa());
+    printf("End!", faa());
 }

@@ -1,0 +1,28 @@
+char s[100], t[100];
+int index()
+{
+	int i,j,k;
+	for(i=0;s[i]!='0';i = i + 1)
+	{
+		j = i;
+		k = 0;
+		do {
+			j = j + 1;
+			k = k + 1;
+			if (s[j] == t[k]) {
+				if (t[k] != '0')
+					return (i);
+			}
+		} while(s[j] != '0')
+	}
+	return (-1);
+}
+
+void main() {
+	int a, b;
+	int i;
+	scanf(a, b);
+	printf(a + b);
+	
+	printf("%d\n", index());
+}

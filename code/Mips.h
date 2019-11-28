@@ -7,7 +7,7 @@
 
 #include "SymbolMap.h"
 
-enum InstrType {constdef, vardef, funcdef, paradef, cal, ret, push, fcall, label, bgoto, bnz, bz};
+enum InstrType {constdef, vardef, funcdef, paradef, cal, ret, push, fcall, label, bgoto, bnz, bz, mac};
 
 struct Instr{
     InstrType type;
@@ -26,11 +26,16 @@ private:
     vector<SymbolMap> symbolMaps;
     vector<instr> instrs;
     vector<string> constStrings;
+    vector<string> dotMacro;
+    vector<string> dotData;
+    vector<string> dotText;
     ofstream outMips;
 
     SymbolMap *currentMap;
     int codePlace;
+    int inlines;
     int currentAddr;
+    int currentStack;
     int paras;
     int funcStack;
     int pushes;
@@ -39,15 +44,28 @@ private:
     string condType;
 public:
     Mips(vector<string> &middleCode);
+
     void parse();
 
     void getSent();
 
+    void outToMacro(string str);
+
+    void outToData(string str);
+
+    void outToText(string str);
+
+    void setMacro();
+
+    void setData();
+
+    void parseFunc();
+
+    void parseDef();
+
+    void outSymbolMap();
+
     void parseSent();
-
-    void outToMips(string str);
-
-    void createPreVar();
 };
 
 

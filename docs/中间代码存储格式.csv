@@ -1,0 +1,14 @@
+InstrType,iden0,iden1,iden2,iden3,iden4
+constdef,const,int,a,=,1
+vardef,var,int,a[2],,
+funcdef,int,foo,,,
+paradef,para,int,a,,
+cal,a[1],=,b,+,c
+ret,ret,a,,,
+push,push,a,,,
+fcall,call,foo,,,
+label,Label:,,,,
+bgoto,GOTO,Labe11,,,
+bnz,BNZ,Label1,,,
+bz,BZ,Label1,,,
+mac,mac,scanf,a,,
