@@ -10,7 +10,7 @@ void Parser::parse() {
     lexer.parse();
     assert.parse();
     assert.printMiddleCode("middle_code.txt");
-    error.printError("error.txt");
+    // error.printError("error.txt");
 }
 
 void Parser::parse(string filename) {

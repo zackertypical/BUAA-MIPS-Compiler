@@ -1,0 +1,57 @@
+void main() {
+	int a;
+	int b, c;
+	a = 1;
+	b = 2;
+	c = 0;
+	if (a == a) printf("a == a, True");
+	else printf("a == a, False");
+	if (a == b) printf("a == b, True");
+	else printf("a == b, False");
+	if (a != b) printf("a != b, True");
+	else printf("a != b, False");
+	if (a != a) printf("a != a, True");
+	else printf("a != a, False");
+	if (a > a) printf("a > a, True");
+	else printf("a > a, False");
+
+	if (a > b) printf("a > b, True");
+	else printf("a > b, False");
+
+	if (b > a) printf("b > a, True");
+	else printf("b > a, False");
+	
+	if (a >= a) printf("a >= a, True");
+	else printf("a >= a, False");
+	
+	if (a >= b) printf("a >= b, True");
+	else printf("a >= b, False");
+	
+	if (b >= a) printf("b >= a, True");
+	else printf("b >= a, False");
+	
+	
+	if (a < a) printf("a < a, True");
+	else printf("a < a, False");
+	
+	if (a < b) printf("a < b, True");
+	else printf("a < b, False");
+	
+	if (b < a) printf("b < a, True");
+	else printf("b < a, False");
+
+	if (a <= a) printf("a <= a, True");
+	else printf("a <= a, False");
+	
+	if (a <= b) printf("a <= b, True");
+	else printf("a <= b, False");
+	
+	if (b <= a) printf("b <= a, True");
+	else printf("b <= a, False");
+
+	if (a) printf("a, True");
+	else printf("a, False");
+
+	if (c) printf("c, True");
+	else printf("c, False");
+}

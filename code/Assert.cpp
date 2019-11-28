@@ -25,6 +25,7 @@ void Assert::appendMiddleCode(string string1) {
 string Assert::parsePolandExpr(string str) {
     int funcs = 0;
     int mode = 0;
+    cout << str << endl;
     for (int i = 0; i < str.length(); i++) {
         if (!mode && str[i] == '(') {
             mode++;
@@ -92,7 +93,6 @@ string Assert::parsePolandExpr(string str) {
 }
 
 void Assert::parsePolandFunc(string str, string funcName, string rets) {
-    cout << str << endl;
     int paras = 0;
     int mode = 0;
     int i = 0;
@@ -151,7 +151,7 @@ Token Assert::symFind(string idenName) {
             return tk;
         }
     }
-    error.addError(symLineNo, 'c');
+    // error.addError(symLineNo, 'c');
     return Token(illegal, symLineNo);
 }
 
@@ -663,7 +663,8 @@ void Assert::parse_cond() {
         parsePolandExpr(exprps.back());
         newMiddleCode("__cond1 " + tmpf + " __cond2");
     } else {
-        newMiddleCode("__cond1");
+        newMiddleCode("__cond2 = 0");
+        newMiddleCode("__cond1 != cond2");
     }
     DEBUG_OUT("条件")
 }
@@ -979,20 +980,23 @@ Attrs Assert::parse_iden() {
 
 int Assert::parse_expr() {
     int type1 = 0;
+    string sign;
     if (symType == pluss || symType == minu) {
         while (exprStack.back() == "+" || exprStack.back() == "-" || exprStack.back() == "*" ||
                exprStack.back() == "/" || exprStack.back() == "[]") {
             exprp += exprStack.back() + " ";
             exprStack.pop_back();
         }
-        exprStack.push_back(symName + "s");
+        sign = symName + "s";
+        exprStack.push_back(sign);
         getSym();
     }
-    type1 = parse_term();
+    type1 = parse_term(sign);
     int type2 = 2;
     while (symType == pluss || symType == minu) {
         while (exprStack.back() == "+" || exprStack.back() == "-" || exprStack.back() == "*" ||
-               exprStack.back() == "/" || exprStack.back() == "[]") {
+               exprStack.back() == "/" || exprStack.back() == "[]" || exprStack.back() == "-s" ||
+               exprStack.back() == "+s") {
             exprp += exprStack.back() + " ";
             exprStack.pop_back();
         }
@@ -1019,7 +1023,28 @@ int Assert::parse_term() {
     int type1 = parse_factor();
     int type2 = 2;
     while (symType == mult || symType == divv) {
-        while (exprStack.back() == "*" || exprStack.back() == "/" || exprStack.back() == "[]") {
+        while (exprStack.back() == "*" || exprStack.back() == "/" || exprStack.back() == "[]" ||
+               exprStack.back() == "-s" || exprStack.back() == "+s") {
+            exprp += exprStack.back() + " ";
+            exprStack.pop_back();
+        }
+        exprStack.push_back(symName);
+        getSym();
+        type2 = parse_factor();
+    }
+    DEBUG_OUT("项")
+    if (type2 == 2) {
+        return type1;
+    }
+    return 0;
+}
+
+int Assert::parse_term(string sign) {
+    int type1 = parse_factor();
+    int type2 = 2;
+    while (symType == mult || symType == divv) {
+        while (exprStack.back() == "*" || exprStack.back() == "/" || exprStack.back() == "[]" ||
+               exprStack.back() == "-s" || exprStack.back() == "+s") {
             exprp += exprStack.back() + " ";
             exprStack.pop_back();
         }

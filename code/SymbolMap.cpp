@@ -15,7 +15,12 @@ int SymbolMap::add(string name, SymbolType type, int place, int addr) {
     tmp.type = type;
     tmp.place = place;
     tmp.addr = addr;
-    if (search(name) == nullptr) {
+    if (name.substr(0,2) == "__" && search(name) == nullptr) {
+        symbols.insert(make_pair(name, tmp));
+        symbolList.push_back(tmp);
+        return 1;
+    }
+    if (name.substr(0,2) != "__" && symbols.find(name) == symbols.end()) {
         symbols.insert(make_pair(name, tmp));
         symbolList.push_back(tmp);
         return 1;

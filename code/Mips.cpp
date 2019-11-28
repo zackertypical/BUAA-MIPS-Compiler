@@ -235,7 +235,7 @@ void Mips::parseFunc() {
         } else if (currentInstr.type == paradef) {
             currentFuncParas++;
         } else if (currentInstr.type == ret) {
-            if (instrs.size() >= codePlace - 1 || instrs.at(codePlace + 1).type != funcdef) {
+            if (instrs.size() <= codePlace + 1 || instrs.at(codePlace + 1).type != funcdef) {
                 canInline = 0;
             }
         } else if (currentInstr.type == fcall) {
@@ -472,7 +472,7 @@ void Mips::parseSent() {
                 break;
             case ret:
                 // 只处理不在函数最后的return
-                if (instrs.size() < codePlace - 1 && instrs.at(codePlace + 1).type != funcdef) {
+                if (instrs.size() > codePlace + 1 && instrs.at(codePlace + 1).type != funcdef) {
                     if (!currentInstr.iden1.empty()) {
                         outToText(currentMap->loadSymbol("$v1", "__retval"));
                     }
@@ -640,10 +640,10 @@ void Mips::parseSent() {
                     }
                 }
                 if (currentInstr.iden0 == "__print") {
-                    currentMap->setType("__print", currentMap->search(currentInstr.iden2)->type);
+                    currentMap->setType("__print", currentMap->getType(currentInstr.iden2));
                 }
                 if (currentInstr.iden0.substr(0, 6) == "__func") {
-                    currentMap->setType(currentInstr.iden0, currentMap->search(currentInstr.iden2)->type);
+                    currentMap->setType(currentInstr.iden0, currentMap->getType(currentInstr.iden2));
                 }
                 break;
             case label:
