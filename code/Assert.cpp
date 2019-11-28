@@ -25,7 +25,6 @@ void Assert::appendMiddleCode(string string1) {
 string Assert::parsePolandExpr(string str) {
     int funcs = 0;
     int mode = 0;
-    cout << str << endl;
     for (int i = 0; i < str.length(); i++) {
         if (!mode && str[i] == '(') {
             mode++;
