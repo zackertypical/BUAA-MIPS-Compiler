@@ -806,25 +806,37 @@ void Assert::parse_printf() {
             parse_str();
             newMiddleCode("mac printf_string");
         } else {
-            parse_expr();
-            exprps.back() = "__print " + exprps.back() + "= ";
-            parsePolandExpr(exprps.back());
-            newMiddleCode("mac printf_expr");
+            if (symType == charcon) {
+                newMiddleCode("__print = " + to_string((int) symName[0]));
+                newMiddleCode("mac printf_char");
+                getSym();
+            } else {
+                parse_expr();
+                exprps.back() = "__print " + exprps.back() + "= ";
+                parsePolandExpr(exprps.back());
+                newMiddleCode("mac printf_expr");
+            }
         }
         if (symType == rparent) {
             getSym();
             DEBUG_OUT("printf语句")
         } else if (symType == comma) {
             getSym();
-            parse_expr();
-            exprps.back() = "__print " + exprps.back() + "= ";
-            parsePolandExpr(exprps.back());
+            if (symType == charcon) {
+                newMiddleCode("__print = " + to_string((int) symName[0]));
+                newMiddleCode("mac printf_char");
+                getSym();
+            } else {
+                parse_expr();
+                exprps.back() = "__print " + exprps.back() + "= ";
+                parsePolandExpr(exprps.back());
+                newMiddleCode("mac printf_expr");
+            }
             if (symType == rparent) {
                 getSym();
             } else {
                 error.addError(symLineNo, 'l');
             }
-            newMiddleCode("mac printf_expr");
             DEBUG_OUT("printf语句")
         } else {
             error.addError(symLineNo, 'l');

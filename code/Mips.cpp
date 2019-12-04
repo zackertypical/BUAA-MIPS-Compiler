@@ -757,6 +757,9 @@ void Mips::parseSent() {
                         }
                     } else if (currentInstr.iden1 == "printf_line") {
                         outToMacro("printf_line");
+                    } else if (currentInstr.iden1 == "printf_char") {
+                        outToMacro(currentMap->loadSymbol("$a0", "__print"));
+                        outToMacro("printf_char");
                     }
                 } else {
                     if (currentInstr.iden1 == "scanf") {
@@ -780,6 +783,9 @@ void Mips::parseSent() {
                         }
                     } else if (currentInstr.iden1 == "printf_line") {
                         outToText("printf_line");
+                    } else if (currentInstr.iden1 == "printf_char") {
+                        outToText(currentMap->loadSymbol("$a0", "__print"));
+                        outToText("printf_char");
                     }
                 }
                 break;

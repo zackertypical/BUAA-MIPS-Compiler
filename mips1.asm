@@ -40,6 +40,15 @@ li $v0, 11
 syscall
 .end_macro
 
+.macro flabel_a
+addiu $sp, $sp, -1024
+li $t8, 97
+sw $t8, 4($sp)
+lw $v1, 4($sp)
+addiu $fp, $fp, -4
+addiu $sp, $sp, 1024
+.end_macro
+
 .data
 fplabel:
 .space 10240
@@ -49,19 +58,52 @@ slabelb:
 .asciiz ""
 slabeln:
 .asciiz "\n"
+__str0:
+.asciiz " "
+__str1:
+.asciiz " "
 
 .text
 la $fp, fplabel
 la $gp, gplabel
-li $t8, 1
-sw $t8 0($gp)
 jal flabel_main
 flabel_main:
 addiu $sp, $sp, -1024
-li $t8, 2
-sw $t8 0($gp)
-lw $t8, 0($gp)
+li $t8, 99
+sw $t8 0($sp)
+lw $t8, 0($sp)
+sw $t8, 8($sp)
+lw $a0, 8($sp)
+printf_char
+printf_line
+li $t8, 100
 sw $t8, 4($sp)
-lw $a0, 4($sp)
-printf_int
+la $a3, __str0
+printf_string
+lw $t8, 4($sp)
+sw $t8, 8($sp)
+lw $a0, 8($sp)
+printf_char
+printf_line
+li $t8, 99
+sw $t8, 8($sp)
+lw $a0, 8($sp)
+printf_char
+printf_line
+la $a3, __str1
+printf_string
+li $t8, 100
+sw $t8, 8($sp)
+lw $a0, 8($sp)
+printf_char
+printf_line
+push $0
+flabel_a
+sw $v1, 12($sp)
+lw $t8, 12($sp)
+sw $t8, 16($sp)
+lw $t8, 16($sp)
+sw $t8, 8($sp)
+lw $a0, 8($sp)
+printf_char
 printf_line
