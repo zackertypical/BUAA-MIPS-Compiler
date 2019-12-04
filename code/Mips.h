@@ -26,7 +26,7 @@ private:
     vector<SymbolMap> symbolMaps;
     vector<instr> instrs;
     vector<string> constStrings;
-    vector<string> dotMacro;
+    map<string, vector<string>> dotMacro;
     vector<string> dotData;
     vector<string> dotText;
     ofstream outMips;
@@ -38,10 +38,11 @@ private:
     int currentStack;
     int paras;
     int funcStack;
-    int pushes;
+    int macrolabel;
     string currentCode;
     instr currentInstr;
     string condType;
+    string nowMacro;
 public:
     Mips(vector<string> &middleCode);
 

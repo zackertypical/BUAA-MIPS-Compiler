@@ -15,17 +15,28 @@ int SymbolMap::add(string name, SymbolType type, int place, int addr) {
     tmp.type = type;
     tmp.place = place;
     tmp.addr = addr;
-    if (name.substr(0,2) == "__" && search(name) == nullptr) {
+    if (name.substr(0,2) == "__" && symbols.find(name) == symbols.end()) {
         symbols.insert(make_pair(name, tmp));
         symbolList.push_back(tmp);
         return 1;
     }
-    if (name.substr(0,2) != "__" && symbols.find(name) == symbols.end()) {
+    if (name.substr(0,2) != "__" && search(name) == nullptr) {
         symbols.insert(make_pair(name, tmp));
         symbolList.push_back(tmp);
         return 1;
     }
     return 0;
+}
+
+int SymbolMap::addForce(string name, SymbolType type, int place, int addr) {
+    symbolInf tmp;
+    tmp.name = name;
+    tmp.type = type;
+    tmp.place = place;
+    tmp.addr = addr;
+    symbols.insert(make_pair(name, tmp));
+    symbolList.push_back(tmp);
+    return 1;
 }
 
 void SymbolMap::addFunc(string name, SymbolType type, int paras, int canInline) {

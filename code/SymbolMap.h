@@ -58,6 +58,8 @@ public:
     string saveSymbol(string str, string name);
 
     string loadSymbol(string str, string name);
+
+    int addForce(string name, SymbolType type, int place, int addr);
 };
 
 

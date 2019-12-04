@@ -13,7 +13,7 @@ Mips::Mips(vector<string> &middleCode) : middleCode(middleCode) {
     currentStack = 0;
     paras = 0;
     funcStack = 0;
-    pushes = 0;
+    macrolabel = 0;
 }
 
 void Mips::parse() {
@@ -21,8 +21,6 @@ void Mips::parse() {
         getSent();
         instrs.push_back(currentInstr);
     }
-    // 定义一些常用的宏
-    setMacro();
 
     // 分析vector instrs中的中间代码
     // 寻找可以内联的函数，并构建函数符号表
@@ -37,9 +35,6 @@ void Mips::parse() {
 
     outMips.open("mips.txt", ios::trunc | ios::out);
 
-    for (string elm : dotMacro) {
-        outMips << elm << endl;
-    }
     outMips << ".data" << endl;
     for (string elm : dotData) {
         outMips << elm << endl;
@@ -58,56 +53,11 @@ void Mips::outToText(string str) {
 }
 
 void Mips::outToMacro(string str) {
-    dotMacro.push_back(str);
+    dotMacro[nowMacro].push_back(str);
 }
 
 void Mips::outToData(string str) {
     dotData.push_back(str);
-}
-
-void Mips::setMacro() {
-    outToMacro(".macro push %x");
-    outToMacro("sw %x, 0($fp)");
-    outToMacro("addiu $fp, $fp, 4");
-    outToMacro(".end_macro");
-    outToMacro("");
-    outToMacro(".macro pop %x");
-    outToMacro("addiu $fp, $fp, -4");
-    outToMacro("lw %x, 0($fp)");
-    outToMacro(".end_macro");
-    outToMacro("");
-    outToMacro(".macro scanf_int");
-    outToMacro("li $v0, 5");
-    outToMacro("syscall");
-    outToMacro(".end_macro");
-    outToMacro("");
-    outToMacro(".macro scanf_char");
-    outToMacro("li $v0, 12");
-    outToMacro("syscall");
-    outToMacro(".end_macro");
-    outToMacro("");
-    outToMacro(".macro printf_line");
-    outToMacro("la $a0, slabeln");
-    outToMacro("li $v0, 4");
-    outToMacro("syscall");
-    outToMacro(".end_macro");
-    outToMacro(".macro printf_string");
-    outToMacro("move $a0, $a3");
-    outToMacro("li $v0, 4");
-    outToMacro("syscall");
-    outToMacro("la $a3, slabelb");
-    outToMacro(".end_macro");
-    outToMacro("");
-    outToMacro(".macro printf_int");
-    outToMacro("li $v0, 1");
-    outToMacro("syscall");
-    outToMacro(".end_macro");
-    outToMacro("");
-    outToMacro(".macro printf_char");
-    outToMacro("li $v0, 11");
-    outToMacro("syscall");
-    outToMacro(".end_macro");
-    outToMacro("");
 }
 
 void Mips::setData() {
@@ -259,12 +209,12 @@ void Mips::parseDef() {
             currentStack = 0;
         } else if (currentInstr.type == paradef) {
             if (currentInstr.iden1 == "int") {
-                currentMap->add(currentInstr.iden2 + "_Fake", pint, 3, -currentFuncParas * 4);
-                currentMap->add(currentInstr.iden2, vint, 1, currentStack * 4);
+                currentMap->addForce(currentInstr.iden2 + "_Fake", pint, 3, -currentFuncParas * 4);
+                currentMap->addForce(currentInstr.iden2, vint, 1, currentStack * 4);
                 currentStack++;
             } else {
-                currentMap->add(currentInstr.iden2 + "_Fake", pchar, 3, -currentFuncParas * 4);
-                currentMap->add(currentInstr.iden2, vchar, 1, currentStack * 4);
+                currentMap->addForce(currentInstr.iden2 + "_Fake", pchar, 3, -currentFuncParas * 4);
+                currentMap->addForce(currentInstr.iden2, vchar, 1, currentStack * 4);
                 currentStack++;
             }
             currentFuncParas--;
@@ -280,12 +230,12 @@ void Mips::parseDef() {
                         }
                         int n = stoi(currentInstr.iden2.substr(i + 1, currentInstr.iden2.size() - i - 1));
                         for (int j = 0; j < n; j++) {
-                            currentMap->add(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", aint, 0,
+                            currentMap->addForce(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", aint, 0,
                                             currentAddr * 4);
                             currentAddr++;
                         }
                     } else {
-                        currentMap->add(currentInstr.iden2, vint, 0, currentAddr * 4);
+                        currentMap->addForce(currentInstr.iden2, vint, 0, currentAddr * 4);
                         currentAddr++;
                     }
                 } else {
@@ -298,12 +248,12 @@ void Mips::parseDef() {
                         }
                         int n = stoi(currentInstr.iden2.substr(i + 1, currentInstr.iden2.size() - i - 1));
                         for (int j = 0; j < n; j++) {
-                            currentMap->add(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", achar, 0,
+                            currentMap->addForce(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", achar, 0,
                                             currentAddr * 4);
                             currentAddr++;
                         }
                     } else {
-                        currentMap->add(currentInstr.iden2, vchar, 0, currentAddr * 4);
+                        currentMap->addForce(currentInstr.iden2, vchar, 0, currentAddr * 4);
                         currentAddr++;
                     }
                 }
@@ -318,12 +268,12 @@ void Mips::parseDef() {
                         }
                         int n = stoi(currentInstr.iden2.substr(i + 1, currentInstr.iden2.size() - i - 1));
                         for (int j = 0; j < n; j++) {
-                            currentMap->add(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", aint, 1,
+                            currentMap->addForce(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", aint, 1,
                                             currentStack * 4);
                             currentStack++;
                         }
                     } else {
-                        currentMap->add(currentInstr.iden2, vint, 1, currentStack * 4);
+                        currentMap->addForce(currentInstr.iden2, vint, 1, currentStack * 4);
                         currentStack++;
                     }
                 } else {
@@ -336,12 +286,12 @@ void Mips::parseDef() {
                         }
                         int n = stoi(currentInstr.iden2.substr(i + 1, currentInstr.iden2.size() - i - 1));
                         for (int j = 0; j < n; j++) {
-                            currentMap->add(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", achar, 1,
+                            currentMap->addForce(currentInstr.iden2.substr(0, i) + "[" + to_string(j) + "]", achar, 1,
                                             currentStack * 4);
                             currentStack++;
                         }
                     } else {
-                        currentMap->add(currentInstr.iden2, vchar, 1, currentStack * 4);
+                        currentMap->addForce(currentInstr.iden2, vchar, 1, currentStack * 4);
                         currentStack++;
                     }
                 }
@@ -441,8 +391,6 @@ void Mips::parseSent() {
                         }
                         outToMacro("addiu $fp, $fp, " + to_string(currentMap->searchFunc(lastFunc)->place * -4));
                         outToMacro("addiu $sp, $sp, 1024");
-                        outToMacro(".end_macro");
-                        outToMacro("");
                     } else {
                         if (currentMap->getNext(lastFunc)->search("__retval") != nullptr) {
                             outToText(currentMap->getNext(lastFunc)->loadSymbol("$v1", "__retval"));
@@ -459,7 +407,8 @@ void Mips::parseSent() {
                 // 处理这个函数的开头
                 lastFunc = currentInstr.iden1;
                 if (currentMap->searchFunc(currentInstr.iden1)->addr) {
-                    outToMacro(".macro flabel_" + currentInstr.iden1);
+                    nowMacro = "flabel_" + currentInstr.iden1;
+                    dotMacro.insert(make_pair(nowMacro, vector<string>()));
                     outToMacro("addiu $sp, $sp, -1024");
                 } else {
                     outToText("flabel_" + currentInstr.iden1 + ":");
@@ -489,27 +438,40 @@ void Mips::parseSent() {
                             outToMacro("la $a3, " + currentInstr.iden1);
                         } else {
                             outToMacro(currentMap->loadSymbol("$t8", currentInstr.iden1));
-                            outToMacro("push $t8");
+                            outToMacro("sw $t8, 0($fp)");
+                            outToMacro("addiu $fp, $fp, 4");
                         }
                     } else {
                         if (currentInstr.iden1.substr(0, 5) == "__str") {
                             outToText("la $a3, " + currentInstr.iden1);
                         } else {
                             outToText(currentMap->loadSymbol("$t8", currentInstr.iden1));
-                            outToText("push $t8");
+                            outToText("sw $t8, 0($fp)");
+                            outToText("addiu $fp, $fp, 4");
                         }
                     }
                 } else {
                     if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
-                        outToMacro("push $0");
+                        outToMacro("addiu $fp, $fp, 4");
                     } else {
-                        outToText("push $0");
+                        outToText("addiu $fp, $fp, 4");
                     }
                 }
                 break;
             case fcall:
                 if (currentMap->getPrev()->searchFunc(currentInstr.iden1)->addr) {
-                    outToText("flabel_" + currentInstr.iden1);
+                    outToText("# inline function " + currentInstr.iden1);
+                    for (string elm : dotMacro["flabel_" + currentInstr.iden1]) {
+                        if (elm.back() == '?') {
+                            outToText(elm.substr(0, elm.size() - 2) + '_' + to_string(macrolabel) + ":");
+                        } else if (elm.back() == '!') {
+                            outToText(elm.substr(0, elm.size() - 1) + '_' + to_string(macrolabel));
+                        } else {
+                            outToText(elm);
+                        }
+                    }
+                    macrolabel++;
+                    outToText("# inline end");
                     outToText(currentMap->saveSymbol("$v1", "RET"));
                 } else {
                     outToText("jal flabel_" + currentInstr.iden1);
@@ -648,14 +610,14 @@ void Mips::parseSent() {
                 break;
             case label:
                 if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
-                    outToMacro(currentInstr.iden0);
+                    outToMacro(currentInstr.iden0 + "?");
                 } else {
                     outToText(currentInstr.iden0);
                 }
                 break;
             case bgoto:
                 if (currentMap->getPrev()->searchFunc(lastFunc)->addr) {
-                    outToMacro("j " + currentInstr.iden1);
+                    outToMacro("j " + currentInstr.iden1 + "!");
                 } else {
                     outToText("j " + currentInstr.iden1);
                 }
@@ -666,17 +628,17 @@ void Mips::parseSent() {
                     outToMacro(currentMap->loadSymbol("$t9", "__cond2"));
                     outToMacro("sub $t8, $t8, $t9");
                     if (condType == "==") {
-                        outToMacro("beqz $t8, " + currentInstr.iden1);
+                        outToMacro("beqz $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == "!=") {
-                        outToMacro("bnez $t8, " + currentInstr.iden1);
+                        outToMacro("bnez $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == ">=") {
-                        outToMacro("bgez $t8, " + currentInstr.iden1);
+                        outToMacro("bgez $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == "<=") {
-                        outToMacro("blez $t8, " + currentInstr.iden1);
+                        outToMacro("blez $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == ">") {
-                        outToMacro("bgtz $t8, " + currentInstr.iden1);
+                        outToMacro("bgtz $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == "<") {
-                        outToMacro("bltz $t8, " + currentInstr.iden1);
+                        outToMacro("bltz $t8, " + currentInstr.iden1 + "!");
                     }
                 } else {
                     outToText(currentMap->loadSymbol("$t8", "__cond1"));
@@ -703,17 +665,17 @@ void Mips::parseSent() {
                     outToMacro(currentMap->loadSymbol("$t9", "__cond2"));
                     outToMacro("sub $t8, $t8, $t9");
                     if (condType == "==") {
-                        outToMacro("bnez $t8, " + currentInstr.iden1);
+                        outToMacro("bnez $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == "!=") {
-                        outToMacro("beqz $t8, " + currentInstr.iden1);
+                        outToMacro("beqz $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == ">=") {
-                        outToMacro("bltz $t8, " + currentInstr.iden1);
+                        outToMacro("bltz $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == "<=") {
-                        outToMacro("bgtz $t8, " + currentInstr.iden1);
+                        outToMacro("bgtz $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == ">") {
-                        outToMacro("blez $t8, " + currentInstr.iden1);
+                        outToMacro("blez $t8, " + currentInstr.iden1 + "!");
                     } else if (condType == "<") {
-                        outToMacro("bgez $t8, " + currentInstr.iden1);
+                        outToMacro("bgez $t8, " + currentInstr.iden1 + "!");
                     }
                 } else {
                     outToText(currentMap->loadSymbol("$t8", "__cond1"));
@@ -739,53 +701,73 @@ void Mips::parseSent() {
                     if (currentInstr.iden1 == "scanf") {
                         SymbolType type = currentMap->search(currentInstr.iden2)->type;
                         if (type == vchar || type == achar || type == pchar) {
-                            outToMacro("scanf_char");
+                            outToMacro("li $v0, 12");
+                            outToMacro("syscall");
                             outToMacro(currentMap->saveSymbol("$v0", currentInstr.iden2));
                         } else {
-                            outToMacro("scanf_int");
+                            outToMacro("li $v0, 5");
+                            outToMacro("syscall");
                             outToMacro(currentMap->saveSymbol("$v0", currentInstr.iden2));
                         }
                     } else if (currentInstr.iden1 == "printf_string") {
-                        outToMacro("printf_string");
+                        outToMacro("move $a0, $a3");
+                        outToMacro("li $v0, 4");
+                        outToMacro("syscall");
+                        outToMacro("la $a3, slabelb");
                     } else if (currentInstr.iden1 == "printf_expr") {
                         outToMacro(currentMap->loadSymbol("$a0", "__print"));
                         SymbolType type = currentMap->search("__print")->type;
                         if (type == vchar || type == achar || type == pchar) {
-                            outToMacro("printf_char");
+                            outToMacro("li $v0, 11");
+                            outToMacro("syscall");
                         } else {
-                            outToMacro("printf_int");
+                            outToMacro("li $v0, 1");
+                            outToMacro("syscall");
                         }
                     } else if (currentInstr.iden1 == "printf_line") {
-                        outToMacro("printf_line");
+                        outToMacro("la $a0, slabeln");
+                        outToMacro("li $v0, 4");
+                        outToMacro("syscall");
                     } else if (currentInstr.iden1 == "printf_char") {
                         outToMacro(currentMap->loadSymbol("$a0", "__print"));
-                        outToMacro("printf_char");
+                        outToMacro("li $v0, 11");
+                        outToMacro("syscall");
                     }
                 } else {
                     if (currentInstr.iden1 == "scanf") {
                         SymbolType type = currentMap->search(currentInstr.iden2)->type;
                         if (type == vchar || type == achar || type == pchar) {
-                            outToText("scanf_char");
+                            outToText("li $v0, 12");
+                            outToText("syscall");
                             outToText(currentMap->saveSymbol("$v0", currentInstr.iden2));
                         } else {
-                            outToText("scanf_int");
+                            outToText("li $v0, 5");
+                            outToText("syscall");
                             outToText(currentMap->saveSymbol("$v0", currentInstr.iden2));
                         }
                     } else if (currentInstr.iden1 == "printf_string") {
-                        outToText("printf_string");
+                        outToText("move $a0, $a3");
+                        outToText("li $v0, 4");
+                        outToText("syscall");
+                        outToText("la $a3, slabelb");
                     } else if (currentInstr.iden1 == "printf_expr") {
                         SymbolType type = currentMap->search("__print")->type;
                         outToText(currentMap->loadSymbol("$a0", "__print"));
                         if (type == vchar || type == achar || type == pchar) {
-                            outToText("printf_char");
+                            outToText("li $v0, 11");
+                            outToText("syscall");
                         } else {
-                            outToText("printf_int");
+                            outToText("li $v0, 1");
+                            outToText("syscall");
                         }
                     } else if (currentInstr.iden1 == "printf_line") {
-                        outToText("printf_line");
+                        outToText("la $a0, slabeln");
+                        outToText("li $v0, 4");
+                        outToText("syscall");
                     } else if (currentInstr.iden1 == "printf_char") {
                         outToText(currentMap->loadSymbol("$a0", "__print"));
-                        outToText("printf_char");
+                        outToText("li $v0, 11");
+                        outToText("syscall");
                     }
                 }
                 break;
